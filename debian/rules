@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+
+export PYBUILD_DESTDIR_python3=debian/python3-waitress/
+export PYBUILD_DISABLE=test
+
+LAST_CHANGE = $(shell dpkg-parsechangelog -S Date)
+BUILD_DATE  = $(shell LC_ALL=C date -u "+%B %d, %Y" -d "$(LAST_CHANGE)")
+SPHINXOPTS := -N -D html_last_updated_fmt=\"$(BUILD_DATE)\"
+
+export DH_OPTIONS=-O --shebang=/usr/bin/python3
+
+%:
+	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_auto_build:
+	dh_auto_build -v
+	$(MAKE) -C docs clean html SPHINXOPTS="$(SPHINXOPTS)"
+
+override_dh_auto_clean:
+	dh_auto_clean
+	$(MAKE) -C docs clean
+
+.PHONY: override_dh_auto_build override_dh_auto_clean

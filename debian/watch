@@ -1,0 +1,4 @@
+version=3
+
+opts=filenamemangle=s/.*\/(.*)$/waitress-$1/ https://github.com/Pylons/waitress/releases \
+.*[^n]/(?:|v|r|REL_|rel-|waitress(?:_|-))(\d[^\s/]*)\.(?:tar\.xz|txz|tar\.bz2|tbz2|tar\.gz|tgz)

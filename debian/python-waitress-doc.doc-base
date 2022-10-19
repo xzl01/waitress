@@ -1,0 +1,13 @@
+Document: python-waitress-doc
+Title: Waitress Documentation
+Author: Chris McDonough
+Abstract: Manual for Waitress WSGI server
+Section: Programming/Python
+
+Format: HTML
+Index: /usr/share/doc/python-waitress-doc/html/index.html
+Files:
+ /usr/share/doc/python-waitress-doc/html/_sources/*
+ /usr/share/doc/python-waitress-doc/html/_static/*
+ /usr/share/doc/python-waitress-doc/html/*.html
+
