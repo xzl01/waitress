@@ -3,7 +3,7 @@
 Arguments to ``waitress.serve``
 -------------------------------
 
-Here are the arguments you can pass to the `waitress.serve`` function or use
+Here are the arguments you can pass to the ``waitress.serve`` function or use
 in :term:`PasteDeploy` configuration (interchangeably):
 
 host
@@ -34,6 +34,23 @@ listen
     IPv6 IP addresses are supported by surrounding the IP address with brackets.
 
     .. versionadded:: 1.0
+
+server_name
+    This is the value that will be placed in the WSGI environment as
+    ``SERVER_NAME``, the only time that this value is used in the WSGI
+    environment for a request is if the client sent a HTTP/1.0 request without
+    a ``Host`` header set, and no other proxy headers.
+
+    The default is value is ``waitress.invalid``, if your WSGI application is
+    creating URL's that include this as the hostname and you are using a
+    reverse proxy setup, you may want to validate that your reverse proxy is
+    sending the appropriate headers.
+
+    In most situations you will not need to set this value.
+
+    Default: ``waitress.invalid``
+
+    .. versionadded:: 2.0
 
 ipv4
     Enable or disable IPv4 (boolean)
@@ -77,6 +94,15 @@ trusted_proxy
     variables using proxy headers.
 
     For unix sockets, set this value to ``localhost`` instead of an IP address.
+
+    The value ``*`` (wildcard) may be used to signify that all remote peers are
+    to be trusted.
+
+    .. warning::
+       Using the wildcard is a security issue if Waitress is receiving
+       connections from untrusted locations as well as trusted locations. Make
+       sure that waitress is adequately deployed behind an additional layer of
+       security, such as a firewall only allowing traffic from known proxies.
 
     Default: ``None``
 
@@ -141,7 +167,11 @@ clear_untrusted_proxy_headers
    "X-Forwared-For", "X-Forwarded-By", "X-Forwarded-Host", "X-Forwarded-Port",
    "X-Forwarded-Proto") not explicitly allowed by ``trusted_proxy_headers``.
 
-   Default: ``False``
+   Default: ``True``
+
+   .. versionchanged:: 3.0.0
+      In this version default value is set to ``True`` and deprecation warning
+      doesn't show up anymore.
 
    .. versionadded:: 1.2.0
 

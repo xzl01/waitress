@@ -1,16 +1,21 @@
 Source: waitress
 Maintainer: Debian Python Team <team+python@tracker.debian.org>
-Uploaders: Andrej Shadura <andrewsh@debian.org>
 Section: python
 Priority: optional
 Homepage: https://github.com/Pylons/waitress
 Build-Depends:
- debhelper-compat (= 12),
- dh-python,
- python3-all (>= 3.3),
- python3-setuptools (>= 0.6.24),
- python3-sphinx
-Standards-Version: 4.5.0
+ debhelper-compat (= 13),
+ dh-sequence-python3,
+ dh-sequence-sphinxdoc <!nodoc>,
+ netbase,
+ pybuild-plugin-pyproject,
+ python3-all,
+ python3-doc,
+ python3-pytest <!nocheck>,
+ python3-pytest-cov <!nocheck>,
+ python3-setuptools,
+ python3-sphinx <!nocheck>,
+Standards-Version: 4.7.0
 Rules-Requires-Root: no
 Vcs-Browser: https://salsa.debian.org/python-team/packages/waitress
 Vcs-Git: https://salsa.debian.org/python-team/packages/waitress.git
@@ -22,14 +27,13 @@ Architecture: all
 Depends:
  ${misc:Depends},
  ${sphinxdoc:Depends}
-Built-Using: ${sphinxdoc:Built-Using}
 Multi-Arch: foreign
-Description: production-quality pure-Python WSGI server (documentation)
+Description: production-quality pure-Python WSGI server (Documentation)
  Waitress is meant to be a production-quality pure-Python WSGI server with
- very acceptable performance.  It has no dependencies except ones which live
- in the Python standard library.  It runs on CPython on Unix and Windows under
- Python 2.7+ and Python 3.3+.  It is also known to run on PyPy 1.6.0 on UNIX.
- It supports HTTP/1.0 and HTTP/1.1.
+ very acceptable performance. It has no dependencies except ones which live
+ in the Python standard library. It runs on CPython on Unix and Windows under
+ Python 3.8+. It is also known to run on PyPy 3 (version 3.8 compatible Python
+ and above) on UNIX. It supports HTTP/1.0 and HTTP/1.1.
  .
  This package only contains the documentation.
 
@@ -43,9 +47,9 @@ Suggests:
 Provides: httpd-wsgi3
 Description: production-quality pure-Python WSGI server (Python 3)
  Waitress is meant to be a production-quality pure-Python WSGI server with
- very acceptable performance.  It has no dependencies except ones which live
- in the Python standard library.  It runs on CPython on Unix and Windows under
- Python 2.7+ and Python 3.3+.  It is also known to run on PyPy 1.6.0 on UNIX.
- It supports HTTP/1.0 and HTTP/1.1.
+ very acceptable performance. It has no dependencies except ones which live
+ in the Python standard library. It runs on CPython on Unix and Windows under
+ Python 3.8+. It is also known to run on PyPy 3 (version 3.8 compatible Python
+ and above) on UNIX. It supports HTTP/1.0 and HTTP/1.1.
  .
  This is the Python 3 version of the package.

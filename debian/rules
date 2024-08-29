@@ -1,23 +1,27 @@
 #!/usr/bin/make -f
 
 export PYBUILD_DESTDIR_python3=debian/python3-waitress/
-export PYBUILD_DISABLE=test
 
-LAST_CHANGE = $(shell dpkg-parsechangelog -S Date)
-BUILD_DATE  = $(shell LC_ALL=C date -u "+%B %d, %Y" -d "$(LAST_CHANGE)")
-SPHINXOPTS := -N -D html_last_updated_fmt=\"$(BUILD_DATE)\"
+export DH_OPTIONS=-O--shebang=/usr/bin/python3
 
-export DH_OPTIONS=-O --shebang=/usr/bin/python3
+include /usr/share/dpkg/pkg-info.mk
+
+BUILD_DATE  = $(shell LC_ALL=C date -u "+%d %B %Y" -d "@$(SOURCE_DATE_EPOCH)")
+SPHINXOPTS := -N -D html_last_updated_fmt="$(BUILD_DATE)"
 
 %:
-	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
+	dh $@ --buildsystem=pybuild
 
-override_dh_auto_build:
-	dh_auto_build -v
-	$(MAKE) -C docs clean html SPHINXOPTS="$(SPHINXOPTS)"
+override_dh_clean:
+	dh_clean
+	rm -rf .mypy_cache
 
-override_dh_auto_clean:
-	dh_auto_clean
-	$(MAKE) -C docs clean
+override_dh_sphinxdoc:
+ifeq (,$(findstring nodoc, $(DEB_BUILD_OPTIONS)))
+	PYTHONPATH=. python3 -m sphinx -b html $(SPHINXOPTS) docs $(CURDIR)/debian/python-waitress-doc/usr/share/doc/python-waitress-doc/html
+	dh_sphinxdoc
+endif
 
-.PHONY: override_dh_auto_build override_dh_auto_clean
+override_dh_auto_test:
+	# Some tests run against their own http proxy, not the internet
+	http_proxy='' https_proxy='' dh_auto_test -- --after-test='rm {build_dir}/.coverage'

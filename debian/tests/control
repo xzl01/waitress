@@ -1,0 +1,9 @@
+Tests:
+ unittests
+Depends:
+ netbase,
+ python3-all,
+ python3-pytest,
+ python3-pytest-cov,
+ @,
+Restrictions: allow-stderr

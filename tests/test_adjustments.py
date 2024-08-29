@@ -1,16 +1,9 @@
-import sys
 import socket
+import sys
+import unittest
 import warnings
 
-from waitress.compat import (
-    PY2,
-    WIN,
-)
-
-if sys.version_info[:2] == (2, 6):  # pragma: no cover
-    import unittest2 as unittest
-else:  # pragma: no cover
-    import unittest
+from waitress.compat import WIN
 
 
 class Test_asbool(unittest.TestCase):
@@ -60,10 +53,12 @@ class Test_as_socket_list(unittest.TestCase):
             socket.socket(socket.AF_INET, socket.SOCK_STREAM),
             socket.socket(socket.AF_INET6, socket.SOCK_STREAM),
         ]
+
         if hasattr(socket, "AF_UNIX"):
             sockets.append(socket.socket(socket.AF_UNIX, socket.SOCK_STREAM))
         new_sockets = as_socket_list(sockets)
         self.assertEqual(sockets, new_sockets)
+
         for sock in sockets:
             sock.close()
 
@@ -77,6 +72,7 @@ class Test_as_socket_list(unittest.TestCase):
         ]
         new_sockets = as_socket_list(sockets)
         self.assertEqual(new_sockets, [sockets[0], sockets[1]])
+
         for sock in [sock for sock in sockets if isinstance(sock, socket.socket)]:
             sock.close()
 
@@ -99,6 +95,7 @@ class TestAdjustments(unittest.TestCase):
             return True
         except socket.gaierror as e:
             # Check to see what the error is
+
             if e.errno == socket.EAI_ADDRFAMILY:
                 return False
             else:
@@ -220,11 +217,14 @@ class TestAdjustments(unittest.TestCase):
         self.assertRaises(ValueError, self._makeOne, listen="127.0.0.1:test")
 
     def test_service_port(self):
-        if WIN and PY2:  # pragma: no cover
-            # On Windows and Python 2 this is broken, so we raise a ValueError
+        if WIN:  # pragma: no cover
+            # On Windows this is broken, so we raise a ValueError
             self.assertRaises(
-                ValueError, self._makeOne, listen="127.0.0.1:http",
+                ValueError,
+                self._makeOne,
+                listen="127.0.0.1:http",
             )
+
             return
 
         inst = self._makeOne(listen="127.0.0.1:http 0.0.0.0:https")
@@ -354,20 +354,6 @@ class TestAdjustments(unittest.TestCase):
             self.assertTrue(issubclass(w[0].category, DeprecationWarning))
             self.assertIn("Implicitly trusting X-Forwarded-Proto", str(w[0]))
 
-    def test_clear_untrusted_proxy_headers(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.resetwarnings()
-            warnings.simplefilter("always")
-            self._makeOne(
-                trusted_proxy="localhost", trusted_proxy_headers={"x-forwarded-for"}
-            )
-
-            self.assertGreaterEqual(len(w), 1)
-            self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-            self.assertIn(
-                "clear_untrusted_proxy_headers will be set to True", str(w[0])
-            )
-
     def test_deprecated_send_bytes(self):
         with warnings.catch_warnings(record=True) as w:
             warnings.resetwarnings()
@@ -406,6 +392,9 @@ class TestCLI(unittest.TestCase):
 
         return Adjustments.parse_args(argv)
 
+    def assertDictContainsSubset(self, subset, dictionary):
+        self.assertTrue(set(subset.items()) <= set(dictionary.items()))
+
     def test_noargs(self):
         opts, args = self.parse([])
         self.assertDictEqual(opts, {"call": False, "help": False})
@@ -441,18 +430,32 @@ class TestCLI(unittest.TestCase):
             ["--host=localhost", "--port=80", "--unix-socket-perms=777"]
         )
         self.assertDictContainsSubset(
-            {"host": "localhost", "port": "80", "unix_socket_perms": "777",}, opts
+            {
+                "host": "localhost",
+                "port": "80",
+                "unix_socket_perms": "777",
+            },
+            opts,
         )
         self.assertSequenceEqual(args, [])
 
     def test_listen_params(self):
-        opts, args = self.parse(["--listen=test:80",])
+        opts, args = self.parse(
+            [
+                "--listen=test:80",
+            ]
+        )
 
         self.assertDictContainsSubset({"listen": " test:80"}, opts)
         self.assertSequenceEqual(args, [])
 
     def test_multiple_listen_params(self):
-        opts, args = self.parse(["--listen=test:80", "--listen=test:8080",])
+        opts, args = self.parse(
+            [
+                "--listen=test:80",
+                "--listen=test:8080",
+            ]
+        )
 
         self.assertDictContainsSubset({"listen": " test:80 test:8080"}, opts)
         self.assertSequenceEqual(args, [])

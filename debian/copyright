@@ -9,9 +9,9 @@ License: ZPL-2.1
 
 Files: debian/*
 Copyright: 2013—2020 Andrej Shadura <andrewsh@debian.org>
-License: ZPL-2.1 or public-domain
+License: ZPL-2.1
 
-Files: waitress/wasyncore.py
+Files: src/waitress/wasyncore.py
 Copyright: 1996, 2000, Sam Rushing
 License: Python-Rushing
 

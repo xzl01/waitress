@@ -1,1 +1,2 @@
-01-fix-sphinxdoc-conf.patch
+docs-Don-t-try-to-detect-the-version-don-t-use-Pylons-the.patch
+docs-Use-internal-ressources-for-intersphinx.patch

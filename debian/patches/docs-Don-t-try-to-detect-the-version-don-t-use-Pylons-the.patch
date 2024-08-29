@@ -1,27 +1,39 @@
-Description: Don't try to detect the version, don't use Pylons theme.
-Author: Andrew Shadura <andrewsh@debian.org>
+From: Andrew Shadura <andrewsh@debian.org>
+Date: Mon, 9 May 2022 17:41:08 -0400
+Subject: docs: Don't try to detect the version, don't use Pylons theme
 
+Forwarded: not-needed
+---
+ docs/conf.py | 32 ++++++++++++++++++--------------
+ 1 file changed, 18 insertions(+), 14 deletions(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index bb1b1f5..275c0d8 100644
 --- a/docs/conf.py
 +++ b/docs/conf.py
-@@ -19,7 +19,7 @@
- 
- import datetime
- import pkg_resources
+@@ -23,7 +23,8 @@ try:
+     from importlib.metadata import version as metadata_version
+ except ImportError:
+     from importlib_metadata import version as metadata_version
 -import pylons_sphinx_themes
-+# import pylons_sphinx_themes
++
++from subprocess import check_output
  
  # General configuration
  # ---------------------
-@@ -53,7 +53,7 @@
+@@ -57,7 +58,10 @@ copyright = "2012-%s, Agendaless Consulting <chrism@plope.com>" % thisyear
  # other places throughout the built documents.
  #
  # The short X.Y version.
--version = pkg_resources.get_distribution("waitress").version
-+version = '1.4.1' # pkg_resources.get_distribution("waitress").version
+-version = metadata_version("waitress")
++#version = metadata_version("waitress")
++version = check_output(
++    ('dpkg-parsechangelog', '-S', 'Version', '-l', '../debian/changelog'),
++    encoding='UTF-8').strip()
  # The full version, including alpha/beta/rc tags.
  release = version
  
-@@ -100,9 +100,9 @@
+@@ -104,9 +108,9 @@ smartquotes = False
  # -----------------------
  
  # Add and use Pylons theme
@@ -34,7 +46,7 @@ Author: Andrew Shadura <andrewsh@debian.org>
  
  # The style sheet to use for HTML and HTML Help pages. A file of that name
  # must exist either in Sphinx' static/ path, or in one of the custom paths
-@@ -172,15 +172,15 @@
+@@ -176,15 +180,15 @@ html_last_updated_fmt = "%b %d, %Y"
  htmlhelp_basename = "waitress"
  
  # Control display of sidebars

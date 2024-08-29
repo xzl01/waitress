@@ -1,5 +1,7 @@
 ---
 Bug-Database: https://github.com/Pylons/waitress/issues
 Bug-Submit: https://github.com/Pylons/waitress/issues/new
+FAQ: https://docs.pylonsproject.org/projects/waitress/en/latest/
 Repository: https://github.com/Pylons/waitress.git
 Repository-Browse: https://github.com/Pylons/waitress
+Security-Contact: pylons-project-security@googlegroups.com

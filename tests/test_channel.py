@@ -1,5 +1,7 @@
-import unittest
 import io
+import unittest
+
+import pytest
 
 
 class TestHTTPChannel(unittest.TestCase):
@@ -29,13 +31,13 @@ class TestHTTPChannel(unittest.TestCase):
 
         inst, _, map = self._makeOneWithMap()
 
-        class DummyBuffer(object):
+        class DummyBuffer:
             chunks = []
 
             def append(self, data):
                 self.chunks.append(data)
 
-        class DummyData(object):
+        class DummyData:
             def __len__(self):
                 return MAXINT
 
@@ -173,7 +175,7 @@ class TestHTTPChannel(unittest.TestCase):
 
     def test_readable_with_requests(self):
         inst, sock, map = self._makeOneWithMap()
-        inst.requests = True
+        inst.requests = [True]
         self.assertEqual(inst.readable(), False)
 
     def test_handle_read_no_error(self):
@@ -189,13 +191,11 @@ class TestHTTPChannel(unittest.TestCase):
         self.assertEqual(L, [b"abc"])
 
     def test_handle_read_error(self):
-        import socket
-
         inst, sock, map = self._makeOneWithMap()
         inst.will_close = False
 
         def recv(b):
-            raise socket.error
+            raise OSError
 
         inst.recv = recv
         inst.last_activity = 0
@@ -213,6 +213,13 @@ class TestHTTPChannel(unittest.TestCase):
 
     def test_write_soon_nonempty_byte(self):
         inst, sock, map = self._makeOneWithMap()
+
+        # _flush_some will no longer flush
+        def send(_):
+            return 0
+
+        sock.send = send
+
         wrote = inst.write_soon(b"a")
         self.assertEqual(wrote, 1)
         self.assertEqual(len(inst.outbufs[0]), 1)
@@ -224,14 +231,19 @@ class TestHTTPChannel(unittest.TestCase):
         wrapper = ReadOnlyFileBasedBuffer(f, 8192)
         wrapper.prepare()
         inst, sock, map = self._makeOneWithMap()
+
+        # _flush_some will no longer flush
+        def send(_):
+            return 0
+
+        sock.send = send
+
         outbufs = inst.outbufs
-        orig_outbuf = outbufs[0]
         wrote = inst.write_soon(wrapper)
         self.assertEqual(wrote, 3)
-        self.assertEqual(len(outbufs), 3)
-        self.assertEqual(outbufs[0], orig_outbuf)
-        self.assertEqual(outbufs[1], wrapper)
-        self.assertEqual(outbufs[2].__class__.__name__, "OverflowableBuffer")
+        self.assertEqual(len(outbufs), 2)
+        self.assertEqual(outbufs[0], wrapper)
+        self.assertEqual(outbufs[1].__class__.__name__, "OverflowableBuffer")
 
     def test_write_soon_disconnected(self):
         from waitress.channel import ClientDisconnected
@@ -253,16 +265,29 @@ class TestHTTPChannel(unittest.TestCase):
 
     def test_write_soon_rotates_outbuf_on_overflow(self):
         inst, sock, map = self._makeOneWithMap()
+
+        # _flush_some will no longer flush
+        def send(_):
+            return 0
+
+        sock.send = send
+
         inst.adj.outbuf_high_watermark = 3
         inst.current_outbuf_count = 4
         wrote = inst.write_soon(b"xyz")
         self.assertEqual(wrote, 3)
-        self.assertEqual(len(inst.outbufs), 2)
-        self.assertEqual(inst.outbufs[0].get(), b"")
-        self.assertEqual(inst.outbufs[1].get(), b"xyz")
+        self.assertEqual(len(inst.outbufs), 1)
+        self.assertEqual(inst.outbufs[0].get(), b"xyz")
 
     def test_write_soon_waits_on_backpressure(self):
         inst, sock, map = self._makeOneWithMap()
+
+        # _flush_some will no longer flush
+        def send(_):
+            return 0
+
+        sock.send = send
+
         inst.adj.outbuf_high_watermark = 3
         inst.total_outbufs_len = 4
         inst.current_outbuf_count = 4
@@ -270,15 +295,63 @@ class TestHTTPChannel(unittest.TestCase):
         class Lock(DummyLock):
             def wait(self):
                 inst.total_outbufs_len = 0
-                super(Lock, self).wait()
+                super().wait()
 
         inst.outbuf_lock = Lock()
         wrote = inst.write_soon(b"xyz")
         self.assertEqual(wrote, 3)
-        self.assertEqual(len(inst.outbufs), 2)
-        self.assertEqual(inst.outbufs[0].get(), b"")
-        self.assertEqual(inst.outbufs[1].get(), b"xyz")
+        self.assertEqual(len(inst.outbufs), 1)
+        self.assertEqual(inst.outbufs[0].get(), b"xyz")
         self.assertTrue(inst.outbuf_lock.waited)
+
+    def test_write_soon_attempts_flush_high_water_and_exception(self):
+        from waitress.channel import ClientDisconnected
+
+        inst, sock, map = self._makeOneWithMap()
+
+        # _flush_some will no longer flush, it will raise Exception, which
+        # disconnects the remote end
+        def send(_):
+            inst.connected = False
+            raise Exception()
+
+        sock.send = send
+
+        inst.adj.outbuf_high_watermark = 3
+        inst.total_outbufs_len = 4
+        inst.current_outbuf_count = 4
+
+        inst.outbufs[0].append(b"test")
+
+        class Lock(DummyLock):
+            def wait(self):
+                inst.total_outbufs_len = 0
+                super().wait()
+
+        inst.outbuf_lock = Lock()
+        self.assertRaises(ClientDisconnected, lambda: inst.write_soon(b"xyz"))
+
+        # Validate we woke up the main thread to deal with the exception of
+        # trying to send
+        self.assertTrue(inst.outbuf_lock.waited)
+        self.assertTrue(inst.server.trigger_pulled)
+
+    def test_write_soon_flush_and_exception(self):
+        inst, sock, map = self._makeOneWithMap()
+
+        # _flush_some will no longer flush, it will raise Exception, which
+        # disconnects the remote end
+        def send(_):
+            inst.connected = False
+            raise Exception()
+
+        sock.send = send
+
+        wrote = inst.write_soon(b"xyz")
+        self.assertEqual(wrote, 3)
+        # Validate we woke up the main thread to deal with the exception of
+        # trying to send
+        self.assertTrue(inst.server.trigger_pulled)
 
     def test_handle_write_notify_after_flush(self):
         inst, sock, map = self._makeOneWithMap()
@@ -303,7 +376,7 @@ class TestHTTPChannel(unittest.TestCase):
         inst.total_outbufs_len = len(inst.outbufs[0])
         inst.adj.send_bytes = 1
         inst.adj.outbuf_high_watermark = 2
-        sock.send = lambda x: False
+        sock.send = lambda x, do_close=True: False
         inst.will_close = False
         inst.last_activity = 0
         result = inst.handle_write()
@@ -367,7 +440,7 @@ class TestHTTPChannel(unittest.TestCase):
 
         inst, sock, map = self._makeOneWithMap()
 
-        class DummyHugeOutbuffer(object):
+        class DummyHugeOutbuffer:
             def __init__(self):
                 self.length = MAXINT + 1
 
@@ -380,7 +453,7 @@ class TestHTTPChannel(unittest.TestCase):
 
         buf = DummyHugeOutbuffer()
         inst.outbufs = [buf]
-        inst.send = lambda *arg: 0
+        inst.send = lambda *arg, do_close: 0
         result = inst._flush_some()
         # we are testing that _flush_some doesn't raise an OverflowError
         # when one of its outbufs has a __len__ that returns gt sys.maxint
@@ -439,7 +512,7 @@ class TestHTTPChannel(unittest.TestCase):
         preq.completed = False
         preq.empty = True
         inst.received(b"GET / HTTP/1.1\r\n\r\n")
-        self.assertEqual(inst.requests, ())
+        self.assertEqual(inst.requests, [])
         self.assertEqual(inst.server.tasks, [])
 
     def test_received_preq_completed_empty(self):
@@ -525,14 +598,6 @@ class TestHTTPChannel(unittest.TestCase):
         self.assertEqual(inst.sent_continue, True)
         self.assertEqual(preq.completed, False)
 
-    def test_service_no_requests(self):
-        inst, sock, map = self._makeOneWithMap()
-        inst.requests = []
-        inst.service()
-        self.assertEqual(inst.requests, [])
-        self.assertTrue(inst.server.trigger_pulled)
-        self.assertTrue(inst.last_activity)
-
     def test_service_with_one_request(self):
         inst, sock, map = self._makeOneWithMap()
         request = DummyRequest()
@@ -560,6 +625,7 @@ class TestHTTPChannel(unittest.TestCase):
         request2 = DummyRequest()
         inst.task_class = DummyTaskClass()
         inst.requests = [request1, request2]
+        inst.service()
         inst.service()
         self.assertEqual(inst.requests, [])
         self.assertTrue(request1.serviced)
@@ -705,7 +771,138 @@ class TestHTTPChannel(unittest.TestCase):
         self.assertEqual(inst.requests, [])
 
 
-class DummySock(object):
+class TestHTTPChannelLookahead(TestHTTPChannel):
+    def app_check_disconnect(self, environ, start_response):
+        """
+        Application that checks for client disconnection every
+        second for up to two seconds.
+        """
+        import time
+
+        if hasattr(self, "app_started"):
+            self.app_started.set()
+
+        try:
+            request_body_size = int(environ.get("CONTENT_LENGTH", 0))
+        except ValueError:
+            request_body_size = 0
+        self.request_body = environ["wsgi.input"].read(request_body_size)
+
+        self.disconnect_detected = False
+        check = environ["waitress.client_disconnected"]
+        if environ["PATH_INFO"] == "/sleep":
+            for i in range(3):
+                if i != 0:
+                    time.sleep(1)
+                if check():
+                    self.disconnect_detected = True
+                    break
+
+        body = b"finished"
+        cl = str(len(body))
+        start_response(
+            "200 OK", [("Content-Length", cl), ("Content-Type", "text/plain")]
+        )
+        return [body]
+
+    def _make_app_with_lookahead(self):
+        """
+        Setup a channel with lookahead and store it and the socket in self
+        """
+        adj = DummyAdjustments()
+        adj.channel_request_lookahead = 5
+        channel, sock, map = self._makeOneWithMap(adj=adj)
+        channel.server.application = self.app_check_disconnect
+
+        self.channel = channel
+        self.sock = sock
+
+    def _send(self, *lines):
+        """
+        Send lines through the socket with correct line endings
+        """
+        self.sock.send("".join(line + "\r\n" for line in lines).encode("ascii"))
+
+    def test_client_disconnect(self, close_before_start=False):
+        """Disconnect the socket after starting the task."""
+        import threading
+
+        self._make_app_with_lookahead()
+        self._send(
+            "GET /sleep HTTP/1.1",
+            "Host: localhost:8080",
+            "",
+        )
+        self.assertTrue(self.channel.readable())
+        self.channel.handle_read()
+        self.assertEqual(len(self.channel.server.tasks), 1)
+        self.app_started = threading.Event()
+        self.disconnect_detected = False
+        thread = threading.Thread(target=self.channel.server.tasks[0].service)
+
+        if not close_before_start:
+            thread.start()
+            self.assertTrue(self.app_started.wait(timeout=5))
+
+        # Close the socket, check that the channel is still readable due to the
+        # lookahead and read it, which marks the channel as closed.
+        self.sock.close()
+        self.assertTrue(self.channel.readable())
+        self.channel.handle_read()
+
+        if close_before_start:
+            thread.start()
+
+        thread.join()
+
+        if close_before_start:
+            self.assertFalse(self.app_started.is_set())
+        else:
+            self.assertTrue(self.disconnect_detected)
+
+    def test_client_disconnect_immediate(self):
+        """
+        The same test, but this time we close the socket even before processing
+        started. The app should not be executed.
+        """
+        self.test_client_disconnect(close_before_start=True)
+
+    def test_lookahead_continue(self):
+        """
+        Send two requests to a channel with lookahead and use an
+        expect-continue on the second one, making sure the responses still come
+        in the right order.
+        """
+        self._make_app_with_lookahead()
+        self._send(
+            "POST / HTTP/1.1",
+            "Host: localhost:8080",
+            "Content-Length: 1",
+            "",
+            "x",
+            "POST / HTTP/1.1",
+            "Host: localhost:8080",
+            "Content-Length: 1",
+            "Expect: 100-continue",
+            "",
+        )
+        self.channel.handle_read()
+        self.assertEqual(len(self.channel.requests), 1)
+        self.channel.server.tasks[0].service()
+        data = self.sock.recv(256).decode("ascii")
+        self.assertTrue(data.endswith("HTTP/1.1 100 Continue\r\n\r\n"))
+
+        self.sock.send(b"x")
+        self.channel.handle_read()
+        self.assertEqual(len(self.channel.requests), 1)
+        self.channel.server.tasks[0].service()
+        self.channel._flush_some()
+        data = self.sock.recv(256).decode("ascii")
+        self.assertEqual(data.split("\r\n")[-1], "finished")
+        self.assertEqual(self.request_body, b"x")
+
+
+class DummySock:
     blocking = False
     closed = False
 
@@ -731,8 +928,13 @@ class DummySock(object):
         self.sent += data
         return len(data)
 
+    def recv(self, buffer_size):
+        result = self.sent[:buffer_size]
+        self.sent = self.sent[buffer_size:]
+        return result
 
-class DummyLock(object):
+
+class DummyLock:
     notified = False
 
     def __init__(self, acquirable=True):
@@ -759,7 +961,7 @@ class DummyLock(object):
         pass
 
 
-class DummyBuffer(object):
+class DummyBuffer:
     closed = False
 
     def __init__(self, data, toraise=None):
@@ -783,7 +985,7 @@ class DummyBuffer(object):
         self.closed = True
 
 
-class DummyAdjustments(object):
+class DummyAdjustments:
     outbuf_overflow = 1048576
     outbuf_high_watermark = 1048576
     inbuf_overflow = 512000
@@ -796,11 +998,16 @@ class DummyAdjustments(object):
     expose_tracebacks = True
     ident = "waitress"
     max_request_header_size = 10000
+    url_prefix = ""
+    channel_request_lookahead = 0
+    max_request_body_size = 1048576
 
 
-class DummyServer(object):
+class DummyServer:
     trigger_pulled = False
     adj = DummyAdjustments()
+    effective_port = 8080
+    server_name = ""
 
     def __init__(self):
         self.tasks = []
@@ -813,7 +1020,7 @@ class DummyServer(object):
         self.trigger_pulled = True
 
 
-class DummyParser(object):
+class DummyParser:
     version = 1
     data = None
     completed = True
@@ -831,7 +1038,7 @@ class DummyParser(object):
         return len(data)
 
 
-class DummyRequest(object):
+class DummyRequest:
     error = None
     path = "/"
     version = "1.0"
@@ -844,7 +1051,7 @@ class DummyRequest(object):
         self.closed = True
 
 
-class DummyLogger(object):
+class DummyLogger:
     def __init__(self):
         self.exceptions = []
         self.infos = []
@@ -857,13 +1064,13 @@ class DummyLogger(object):
         self.exceptions.append(msg)
 
 
-class DummyError(object):
+class DummyError:
     code = "431"
     reason = "Bleh"
     body = "My body"
 
 
-class DummyTaskClass(object):
+class DummyTaskClass:
     wrote_header = True
     close_on_finish = False
     serviced = False

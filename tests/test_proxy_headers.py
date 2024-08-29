@@ -1,7 +1,5 @@
 import unittest
 
-from waitress.compat import tobytes
-
 
 class TestProxyHeadersMiddleware(unittest.TestCase):
     def _makeOne(self, app, **kw):
@@ -18,14 +16,18 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
             response.headers = response_headers
 
         response.steps = list(app(environ, start_response))
-        response.body = b"".join(tobytes(s) for s in response.steps)
+        response.body = b"".join(s for s in response.steps)
         return response
 
     def test_get_environment_values_w_scheme_override_untrusted(self):
         inner = DummyApp()
         app = self._makeOne(inner)
         response = self._callFUT(
-            app, headers={"X_FOO": "BAR", "X_FORWARDED_PROTO": "https",}
+            app,
+            headers={
+                "X_FOO": "BAR",
+                "X_FORWARDED_PROTO": "https",
+            },
         )
         self.assertEqual(response.status, "200 OK")
         self.assertEqual(inner.environ["wsgi.url_scheme"], "http")
@@ -40,7 +42,10 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
         response = self._callFUT(
             app,
             addr=["192.168.1.1", 8080],
-            headers={"X_FOO": "BAR", "X_FORWARDED_PROTO": "https",},
+            headers={
+                "X_FOO": "BAR",
+                "X_FORWARDED_PROTO": "https",
+            },
         )
 
         environ = inner.environ
@@ -115,7 +120,9 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
             "X_FORWARDED_HOST": "example.org",
         }
         response = self._callFUT(
-            app, addr=["192.168.1.1", 80], headers=headers_orig.copy(),
+            app,
+            addr=["192.168.1.1", 80],
+            headers=headers_orig.copy(),
         )
         self.assertEqual(response.status, "200 OK")
         environ = inner.environ
@@ -180,7 +187,9 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
     def test_parse_proxy_headers_forwarded_for(self):
         inner = DummyApp()
         app = self._makeOne(
-            inner, trusted_proxy="*", trusted_proxy_headers={"x-forwarded-for"},
+            inner,
+            trusted_proxy="*",
+            trusted_proxy_headers={"x-forwarded-for"},
         )
         response = self._callFUT(app, headers={"X_FORWARDED_FOR": "192.0.2.1"})
         self.assertEqual(response.status, "200 OK")
@@ -191,7 +200,9 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
     def test_parse_proxy_headers_forwarded_for_v6_missing_brackets(self):
         inner = DummyApp()
         app = self._makeOne(
-            inner, trusted_proxy="*", trusted_proxy_headers={"x-forwarded-for"},
+            inner,
+            trusted_proxy="*",
+            trusted_proxy_headers={"x-forwarded-for"},
         )
         response = self._callFUT(app, headers={"X_FORWARDED_FOR": "2001:db8::0"})
         self.assertEqual(response.status, "200 OK")
@@ -475,7 +486,10 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
             trusted_proxy_headers={"forwarded"},
         )
         response = self._callFUT(
-            app, headers={"FORWARDED": "For=198.51.100.2;;proto=https;by=_unused",}
+            app,
+            headers={
+                "FORWARDED": "For=198.51.100.2;;proto=https;by=_unused",
+            },
         )
         self.assertEqual(response.status, "200 OK")
 
@@ -491,7 +505,10 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
             trusted_proxy_headers={"forwarded"},
         )
         response = self._callFUT(
-            app, headers={"FORWARDED": "For=198.51.100.2; proto =https",}
+            app,
+            headers={
+                "FORWARDED": "For=198.51.100.2; proto =https",
+            },
         )
         self.assertEqual(response.status, "400 Bad Request")
         self.assertIn(b'Header "Forwarded" malformed', response.body)
@@ -505,7 +522,10 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
             trusted_proxy_headers={"forwarded"},
         )
         response = self._callFUT(
-            app, headers={"FORWARDED": 'For= "198.51.100.2"; proto =https',}
+            app,
+            headers={
+                "FORWARDED": 'For= "198.51.100.2"; proto =https',
+            },
         )
         self.assertEqual(response.status, "400 Bad Request")
         self.assertIn(b'Header "Forwarded" malformed', response.body)
@@ -555,7 +575,11 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
 
     def test_parse_no_valid_proxy_headers(self):
         inner = DummyApp()
-        app = self._makeOne(inner, trusted_proxy="*", trusted_proxy_count=1,)
+        app = self._makeOne(
+            inner,
+            trusted_proxy="*",
+            trusted_proxy_count=1,
+        )
         response = self._callFUT(
             app,
             headers={
@@ -582,7 +606,12 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
             trusted_proxy_headers={"x-forwarded-proto"},
             logger=logger,
         )
-        response = self._callFUT(app, headers={"X_FORWARDED_PROTO": "http, https",})
+        response = self._callFUT(
+            app,
+            headers={
+                "X_FORWARDED_PROTO": "http, https",
+            },
+        )
         self.assertEqual(response.status, "400 Bad Request")
         self.assertIn(b'Header "X-Forwarded-Proto" malformed', response.body)
 
@@ -596,7 +625,12 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
             trusted_proxy_headers={"x-forwarded-port"},
             logger=logger,
         )
-        response = self._callFUT(app, headers={"X_FORWARDED_PORT": "443, 80",})
+        response = self._callFUT(
+            app,
+            headers={
+                "X_FORWARDED_PORT": "443, 80",
+            },
+        )
         self.assertEqual(response.status, "400 Bad Request")
         self.assertIn(b'Header "X-Forwarded-Port" malformed', response.body)
 
@@ -681,7 +715,7 @@ class TestProxyHeadersMiddleware(unittest.TestCase):
         self.assertIn(b'Header "X-Forwarded-Host" malformed', response.body)
 
 
-class DummyLogger(object):
+class DummyLogger:
     def __init__(self):
         self.logged = []
 
@@ -689,21 +723,24 @@ class DummyLogger(object):
         self.logged.append(msg % args)
 
 
-class DummyApp(object):
+class DummyApp:
     def __call__(self, environ, start_response):
         self.environ = environ
         start_response("200 OK", [("Content-Type", "text/plain")])
-        yield "hello"
+        yield b"hello"
 
 
-class DummyResponse(object):
+class DummyResponse:
     status = None
     headers = None
     body = None
 
 
 def DummyEnviron(
-    addr=("127.0.0.1", 8080), scheme="http", server="localhost", headers=None,
+    addr=("127.0.0.1", 8080),
+    scheme="http",
+    server="localhost",
+    headers=None,
 ):
     environ = {
         "REMOTE_ADDR": addr[0],

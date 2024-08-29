@@ -1,13 +1,11 @@
 def chunks(l, n):  # pragma: no cover
-    """ Yield successive n-sized chunks from l.
-    """
+    """Yield successive n-sized chunks from l."""
     for i in range(0, len(l), n):
         yield l[i : i + n]
 
 
 def gen(body):  # pragma: no cover
-    for chunk in chunks(body, 10):
-        yield chunk
+    yield from chunks(body, 10)
 
 
 def app(environ, start_response):  # pragma: no cover

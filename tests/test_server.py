@@ -113,35 +113,6 @@ class TestWSGIServer(unittest.TestCase):
         inst = self._makeOneWithMap(_start=False)
         self.assertEqual(inst.accepting, False)
 
-    def test_get_server_name_empty(self):
-        inst = self._makeOneWithMap(_start=False)
-        self.assertRaises(ValueError, inst.get_server_name, "")
-
-    def test_get_server_name_with_ip(self):
-        inst = self._makeOneWithMap(_start=False)
-        result = inst.get_server_name("127.0.0.1")
-        self.assertTrue(result)
-
-    def test_get_server_name_with_hostname(self):
-        inst = self._makeOneWithMap(_start=False)
-        result = inst.get_server_name("fred.flintstone.com")
-        self.assertEqual(result, "fred.flintstone.com")
-
-    def test_get_server_name_0000(self):
-        inst = self._makeOneWithMap(_start=False)
-        result = inst.get_server_name("0.0.0.0")
-        self.assertTrue(len(result) != 0)
-
-    def test_get_server_name_double_colon(self):
-        inst = self._makeOneWithMap(_start=False)
-        result = inst.get_server_name("::")
-        self.assertTrue(len(result) != 0)
-
-    def test_get_server_name_ipv6(self):
-        inst = self._makeOneWithMap(_start=False)
-        result = inst.get_server_name("2001:DB8::ffff")
-        self.assertEqual("[2001:DB8::ffff]", result)
-
     def test_get_server_multi(self):
         inst = self._makeOneWithMulti()
         self.assertEqual(inst.__class__.__name__, "MultiSocketServer")
@@ -185,6 +156,7 @@ class TestWSGIServer(unittest.TestCase):
         inst.adj = DummyAdj
         inst._map = {"a": 1, "b": 2}
         self.assertFalse(inst.readable())
+        self.assertTrue(inst.in_connection_overflow)
 
     def test_readable_maplen_lt_connection_limit(self):
         inst = self._makeOneWithMap()
@@ -192,6 +164,19 @@ class TestWSGIServer(unittest.TestCase):
         inst.adj = DummyAdj
         inst._map = {}
         self.assertTrue(inst.readable())
+        self.assertFalse(inst.in_connection_overflow)
+
+    def test_readable_maplen_toggles_connection_overflow(self):
+        inst = self._makeOneWithMap()
+        inst.accepting = True
+        inst.adj = DummyAdj
+        inst._map = {"a": 1, "b": 2}
+        self.assertFalse(inst.in_connection_overflow)
+        self.assertFalse(inst.readable())
+        self.assertTrue(inst.in_connection_overflow)
+        inst._map = {}
+        self.assertTrue(inst.readable())
+        self.assertFalse(inst.in_connection_overflow)
 
     def test_readable_maintenance_false(self):
         import time
@@ -240,7 +225,7 @@ class TestWSGIServer(unittest.TestCase):
         inst.adj = DummyAdj
 
         def foo():
-            raise socket.error
+            raise OSError
 
         inst.accept = foo
         inst.logger = DummyLogger()
@@ -263,7 +248,7 @@ class TestWSGIServer(unittest.TestCase):
     def test_maintenance(self):
         inst = self._makeOneWithMap()
 
-        class DummyChannel(object):
+        class DummyChannel:
             requests = []
 
         zombie = DummyChannel()
@@ -274,8 +259,8 @@ class TestWSGIServer(unittest.TestCase):
         self.assertEqual(zombie.will_close, True)
 
     def test_backward_compatibility(self):
-        from waitress.server import WSGIServer, TcpWSGIServer
         from waitress.adjustments import Adjustments
+        from waitress.server import TcpWSGIServer, WSGIServer
 
         self.assertTrue(WSGIServer is TcpWSGIServer)
         self.inst = WSGIServer(None, _start=False, port=1234)
@@ -411,8 +396,8 @@ if hasattr(socket, "AF_UNIX"):
 
         def test_create_with_unix_socket(self):
             from waitress.server import (
-                MultiSocketServer,
                 BaseWSGIServer,
+                MultiSocketServer,
                 TcpWSGIServer,
                 UnixWSGIServer,
             )
@@ -479,7 +464,7 @@ class DummySock(socket.socket):
         pass
 
 
-class DummyTaskDispatcher(object):
+class DummyTaskDispatcher:
     def __init__(self):
         self.tasks = []
 
@@ -490,7 +475,7 @@ class DummyTaskDispatcher(object):
         self.was_shutdown = True
 
 
-class DummyTask(object):
+class DummyTask:
     serviced = False
     start_response_called = False
     wrote_header = False
@@ -512,12 +497,12 @@ class DummyAdj:
     channel_timeout = 300
 
 
-class DummyAsyncore(object):
+class DummyAsyncore:
     def loop(self, timeout=30.0, use_poll=False, map=None, count=None):
         raise SystemExit
 
 
-class DummyTrigger(object):
+class DummyTrigger:
     def pull_trigger(self):
         self.pulled = True
 
@@ -525,7 +510,7 @@ class DummyTrigger(object):
         pass
 
 
-class DummyLogger(object):
+class DummyLogger:
     def __init__(self):
         self.logged = []
 
